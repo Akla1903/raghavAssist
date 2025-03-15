@@ -4,9 +4,10 @@ body {
     margin: 0;
     padding: 0;
     display: grid;
-    grid-template-columns: 40% 20% 40%;
-
-    justify-content: center; 
+    /* grid-template-columns: 40% 20% 40%;
+    grid-template-rows: 3fr 2fr 1fr; */
+    grid: repeat(8, 100px) / auto-flow;
+    /* justify-content: center;  */
     /* align-items: center; */
     /* height: 100vh; */
 }

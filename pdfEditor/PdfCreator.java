@@ -2,7 +2,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-public class addition {
+public class PdfCreator {
     public static void main(String[] args) {
         try (FileOutputStream fos = new FileOutputStream("output.pdf")) {
 
@@ -21,7 +21,15 @@ public class addition {
                     "/Resources << /Font << /F1 5 0 R >> >> >>\n" +
                     "endobj\n";
 
-            String streamData = "BT /F1 24 Tf 100 700 Td (Hello, PDF!) Tj ET";
+            	     String streamData = "BT /F1 24 Tf 100 700 Td (Hello , my new PDF!) Tj ET";
+
+	    String createTextStream(String text, int fontSize, int x, int y)
+		{
+		return "BT /F1 " + fontSize + " Tf " + x + " " + y + " Td (" + text + ") Tj Et"; 
+		}
+
+		String StreamData1 = createTextStream("Welcome Dipesh" , 12, 50,750);
+
             String obj4 = "4 0 obj\n" +
                     "<< /Length " + streamData.length() + " >>\n" +
                     "stream\n" +
@@ -51,15 +59,10 @@ public class addition {
                     xrefStart + "\n" +
                     "%%EOF";
 
-            fos.write(header.getBytes(StandardCharsets.US_ASCII));
-            fos.write(obj1.getBytes(StandardCharsets.US_ASCII));
-            fos.write(obj2.getBytes(StandardCharsets.US_ASCII));
-            fos.write(obj3.getBytes(StandardCharsets.US_ASCII));
-            fos.write(obj4.getBytes(StandardCharsets.US_ASCII));
-            fos.write(obj5.getBytes(StandardCharsets.US_ASCII));
-            fos.write(xref.getBytes(StandardCharsets.US_ASCII));
-            fos.write(trailer.getBytes(StandardCharsets.US_ASCII));
-
+	String body = header + obj1 + obj2 +  obj3 + obj4 + obj5 + xref + trailer;
+	
+	   fos.write(body.getBytes(StandardCharsets.US_ASCII));
+           
             System.out.println("PDF created as output.pdf");
 
         } catch (IOException e) {

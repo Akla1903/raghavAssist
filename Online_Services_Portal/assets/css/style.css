@@ -16,7 +16,7 @@ body { margin: 0; font-family: Arial, sans-serif; background: var(--bg); color: 
 input:checked + .slider { background-color: #2196F3; }
 input:checked + .slider:before { transform: translateX(20px); }
 
-
+/* style for rtps dropdown list */
  .dropdown {
             position: relative;
             display: inline-block;

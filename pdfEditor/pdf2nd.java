@@ -2,7 +2,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
-public class PdfCreator {
+public class pdf2nd {
+
+	static String createTextStream(String text,int fontSize,int x,int y){
+		return "	BT /F1 " + fontSize + " Tf " + x + " " + y + " Td 0 Tr 0.5 g +(" + text + ") Tj ET "; 
+		}
+
     public static void main(String[] args) {
         try (FileOutputStream fos = new FileOutputStream("output.pdf")) {
 
@@ -21,13 +26,9 @@ public class PdfCreator {
                  			"/Resources << /Font << /F1 5 0 R >> >> >>\n" +
 			                "endobj\n";
 
-           String streamData = "BT /F1 24 Tf 595 600 Td (H) Tj ET";
+           //String streamData = "BT /F1 24 Tf 595 600 Td (H) Tj ET";
 
-	//String createTextStream(String text,int fontSize,int x,int y){
-//		return "BT /F1 " + fontSize + " Tf " + x +  " " + y + " Td (" + text + ") Tj Et"; 
-	//	}
-
-	 //String StreamData1 = createTextStream("WelcomeDipesh" ,12,50,50);
+	 String streamData = createTextStream("Welcome Dipesh" ,12,100,700);
 
          String obj4 = "4 0 obj\n" +
                     "<< /Length " + streamData.length() + " >>\n" +

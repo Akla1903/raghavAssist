@@ -27,3 +27,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+
+  function toggleDropdown(){
+    const menu = document.getElementById("dropdownContent");
+    menu.style.display = (menu.style.display === "block") ? "none" : "block";
+  }
+
+  window.onclick = function(event){
+    if(!event.target.matches('.dropdown-button')){
+      let dropdowns = document.getElementsByClassName("dropdown-content");
+      for(let i = 0 ; i < dropdowns.length; i++){
+        dropdowns[i].style.display = "none";
+      }
+    }
+  };

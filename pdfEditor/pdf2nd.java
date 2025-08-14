@@ -4,11 +4,8 @@ import java.nio.charset.StandardCharsets;
 
 public class pdf2nd {
 
-	static String createTextStream(String text,int fontSize,int x,int y){
-		return "	BT /F1 " + fontSize + " Tf " + x + " " + y + " Td 0 Tr 0.5 g +(" + text + ") Tj ET "; 
-		}
+    static void createTextStream(String text,int fontSize,int x,int y){
 
-    public static void main(String[] args) {
         try (FileOutputStream fos = new FileOutputStream("output.pdf")) {
 
             String header = "%PDF-1.4\n";
@@ -28,7 +25,7 @@ public class pdf2nd {
 
            //String streamData = "BT /F1 24 Tf 595 600 Td (H) Tj ET";
 
-	 String streamData = createTextStream("Welcome Dipesh" ,12,100,700);
+	 String streamData = "BT /F1 " + fontSize + " Tf " + x + " " + y + " Td (" + text + ") Tj ET ";
 
          String obj4 = "4 0 obj\n" +
                     "<< /Length " + streamData.length() + " >>\n" +

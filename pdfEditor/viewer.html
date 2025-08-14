@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PDF Viewer from Scratch</title>
+</head>
+<body>
+  <h2>Upload PDF</h2>
+  <input type="file" id="pdfInput" accept=".pdf">
+  <canvas id="pdfCanvas" width="612" height="792" style="border:1px solid #ccc;"></canvas>
+  <pre id="output"></pre>
+  <pre id="logArea" style="background:#f0f0f0; padding:10px; max-height:200px; overflow:auto;"></pre>
+
+<script>
+function log(msg) {
+  console.log(msg);
+  document.getElementById("logArea").textContent += msg + "\n";
+}
+
+document.getElementById('pdfInput').addEventListener('change', function (e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onerror = function () {
+    log("❌ File reading failed.");
+    alert("Failed to read the PDF file.");
+  };
+
+  reader.onload = function () {
+    try {
+      const arrayBuffer = reader.result;
+      const uint8 = new Uint8Array(arrayBuffer);
+      const text = new TextDecoder("iso-8859-1").decode(uint8);
+
+      document.getElementById("output").textContent = text.slice(0, 500);
+
+      const startxrefIndex = text.lastIndexOf("startxref");
+      if (startxrefIndex === -1) {
+        log("❌ startxref not found.");
+        alert("Invalid PDF: startxref not found.");
+        return;
+      }
+
+      const startxrefText = text.slice(startxrefIndex, startxrefIndex + 50);
+      const offsetMatch = startxrefText.match(/\d+/);
+      if (!offsetMatch) {
+        log("❌ xref offset not found.");
+        alert("Invalid PDF: Cannot find cross-reference table.");
+        return;
+      }
+
+      const xrefOffset = parseInt(offsetMatch[0]);
+      log("✅ Found startxref offset: " + xrefOffset);
+
+      const xrefSection = text.slice(xrefOffset, xrefOffset + 300);
+      log("🔍 XRef Section Preview:\n" + xrefSection);
+
+      const lines = xrefSection.split("\n");
+      let objMap = {};
+      let objStart = -1;
+      let count = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "xref") continue;
+
+        const headerMatch = line.match(/^(\d+)\s+(\d+)$/);
+        if (headerMatch) {
+          objStart = parseInt(headerMatch[1]);
+          count = parseInt(headerMatch[2]);
+          continue;
+        }
+
+        const entryMatch = line.match(/^(\d{10})\s+(\d{5})\s+n$/);
+        if (entryMatch && objStart !== -1) {
+          const offset = parseInt(entryMatch[1]);
+          const objId = objStart++;
+          objMap[objId] = offset;
+        }
+      }
+
+      log("📌 Object Map: ");
+      log(JSON.stringify(objMap, null, 2));
+
+      for (const objId in objMap) {
+        try {
+          const offset = objMap[objId];
+          let objText = "";
+          for (let i = offset; i < uint8.length - 1; i++) {
+            const slice = new TextDecoder("iso-8859-1").decode(uint8.slice(i, i + 6));
+            if (slice === "endob") break;
+            if (slice === "endobj") {
+              const safeOffset = Math.max(0, offset - 20);
+              objText = new TextDecoder("iso-8859-1").decode(uint8.slice(safeOffset, i + 6));
+              break;
+            }
+          }
+
+          if (!objText) {
+            log(`⚠️ Skipping unreadable object ${objId}`);
+            continue;
+          }
+
+          log(`📦 Object ${objId} Content:\n` + objText);
+
+          if (!objText.includes("stream")) {
+            log(`❌ Object ${objId} has no stream.`);
+            continue;
+          }
+
+          const streamMatch = objText.match(/stream\s*(.*?)\s*endstream/is);
+
+          // ✅ Case 1: Uncompressed stream
+          if (streamMatch && !objText.includes("/FlateDecode")) {
+            const streamText = streamMatch[1].trim();
+            log(`📝 Uncompressed Stream:\n${streamText}`);
+
+            if (!/Tj|TJ/.test(streamText)) {
+              log(`⚠️ Object ${objId} contains no Tj/TJ — possibly image.`);
+              continue;
+            }
+
+            const textMatch = streamText.match(/\(\s*([^)]*?)\s*\)\s*Tj/);
+            const text = textMatch ? textMatch[1] : "Unknown";
+
+            const posMatch = streamText.match(/(\d+)\s+(\d+)\s+Td/);
+            const x = posMatch ? parseInt(posMatch[1]) : 100;
+            const y = posMatch ? 792 - parseInt(posMatch[2]) : 100;
+
+            const sizeMatch = streamText.match(/\/F1\s+(\d+)\s+Tf/);
+            const fontSize = sizeMatch ? parseInt(sizeMatch[1]) : 16;
+
+            const canvas = document.getElementById("pdfCanvas");
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = `${fontSize}px Helvetica`;
+
+            try {
+              ctx.fillText(text, x, y);
+            } catch (e) {
+              log("❌ Canvas drawing error: " + e.message);
+            }
+          }
+
+          // ✅ Case 2: Compressed stream (FlateDecode)
+          else if (objText.includes("/FlateDecode")) {
+            const streamStart = objText.indexOf("stream");
+            const streamEnd = objText.indexOf("endstream");
+            if (streamStart === -1 || streamEnd === -1) {
+              log(`⚠️ stream/endstream not found in Object ${objId}`);
+              continue;
+            }
+
+            const pre = new TextEncoder().encode(objText.slice(0, streamStart));
+            const post = new TextEncoder().encode(objText.slice(0, streamEnd));
+            const streamStartIndex = offset + pre.length + 1;
+            const streamEndIndex = offset + post.length;
+
+            const compressedBytes = uint8.slice(streamStartIndex, streamEndIndex);
+            const ds = new DecompressionStream('deflate');
+            const decompressedStream = new Blob([compressedBytes]).stream().pipeThrough(ds);
+            const reader = decompressedStream.getReader();
+            const chunks = [];
+
+            (async () => {
+              try {
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  chunks.push(value);
+                }
+
+                const decompressedBlob = new Blob(chunks);
+                const streamText = await decompressedBlob.text();
+                log("🗃️ Decompressed Stream:\n" + streamText);
+
+                if (!/Tj|TJ/.test(streamText)) {
+                  log(`⚠️ Object ${objId} decompressed but no Tj/TJ — possibly image or unsupported.`);
+                  return;
+                }
+
+                const textMatch = streamText.match(/\(\s*([^)]*?)\s*\)\s*Tj/);
+                const text = textMatch ? textMatch[1] : "Unknown";
+
+                const posMatch = streamText.match(/(\d+)\s+(\d+)\s+Td/);
+                const x = posMatch ? parseInt(posMatch[1]) : 100;
+                const y = posMatch ? 792 - parseInt(posMatch[2]) : 100;
+
+                const sizeMatch = streamText.match(/\/F1\s+(\d+)\s+Tf/);
+                const fontSize = sizeMatch ? parseInt(sizeMatch[1]) : 16;
+
+                const canvas = document.getElementById("pdfCanvas");
+                const ctx = canvas.getContext("2d");
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.font = `${fontSize}px Helvetica`;
+
+                try {
+                  ctx.fillText(text, x, y);
+                } catch (e) {
+                  log("❌ Canvas drawing error: " + e.message);
+                }
+              } catch (e) {
+                log(`❌ Decompression failed for Object ${objId}: ` + e.message);
+              }
+            })();
+          }
+        } catch (e) {
+          log(`❌ Error in Object ${objId}: ` + e.message);
+        }
+      }
+    } catch (e) {
+      log("❌ Critical error: " + e.message);
+    }
+  };
+
+  reader.readAsArrayBuffer(file);
+});
+</script>
+</body>
+</html>
